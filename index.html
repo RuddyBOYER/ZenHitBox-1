@@ -1,0 +1,1368 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>ZenHitBox - Playlist Exportée</title>
+ <style>
+   /* Styles CSS de base */
+   body {
+     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+     background: linear-gradient(135deg, #1e1b4b 0%, #2e3494 50%, #4b2a8a 100%);
+     color: white;
+     margin: 0;
+     padding: 20px;
+     min-height: 100vh;
+     /* Empêcher le pull-to-refresh sur mobile */
+     overscroll-behavior: none;
+   }
+   html {
+     /* Appliquer également au niveau html pour plus de compatibilité */
+     overscroll-behavior: none;
+   }
+   .container {
+     max-width: 800px;
+     margin: 0 auto;
+   }
+   .header {
+     text-align: center;
+     margin-bottom: 30px;
+   }
+   .player {
+     background: rgba(255, 255, 255, 0.1);
+     backdrop-filter: blur(10px);
+     border-radius: 10px;
+     padding: 20px;
+     margin-bottom: 20px;
+     border: 1px solid rgba(255, 255, 255, 0.2);
+   }
+   .playlist {
+     background: rgba(255, 255, 255, 0.1);
+     backdrop-filter: blur(10px);
+     border-radius: 10px;
+     padding: 20px;
+     margin-bottom: 20px;
+     border: 1px solid rgba(255, 255, 255, 0.2);
+   }
+   .playlist-title {
+     font-size: 1.5rem;
+     margin-bottom: 15px;
+     font-weight: 300;
+   }
+   .app-title {
+     font-size: 2rem;
+     font-weight: 300;
+     text-align: center;
+     margin-bottom: 20px;
+     letter-spacing: 1px;
+   }
+   .track {
+     padding: 10px;
+     margin-bottom: 8px;
+     background: rgba(255, 255, 255, 0.05);
+     border-radius: 5px;
+     cursor: pointer;
+     transition: all 0.2s;
+     display: flex;
+     align-items: center;
+     position: relative; /* Important pour le positionnement absolu du badge */
+   }
+   .track:hover {
+     background: rgba(255, 255, 255, 0.1);
+     transform: scale(1.01);
+   }
+   .track.active {
+     background: linear-gradient(to right, rgba(139, 92, 246, 0.2), rgba(99, 102, 241, 0.2));
+     border-left: 3px solid rgba(139, 92, 246, 0.5);
+   }
+   /* Style spécial pour les pistes déjà jouées */
+   .track.played {
+     background: linear-gradient(to right, rgba(236, 72, 153, 0.1), rgba(236, 72, 153, 0.05));
+     border-left: 3px solid rgba(236, 72, 153, 0.5);
+   }
+   .track.dragging {
+     opacity: 0.5;
+     background: rgba(139, 92, 246, 0.3);
+     transform: scale(1.02);
+     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+   }
+   .track-drag-handle {
+     cursor: grab;
+     padding: 0 10px;
+     margin-right: 10px;
+     opacity: 0.5;
+     font-size: 1.2rem;
+   }
+   .track-drag-handle:hover {
+     opacity: 0.8;
+   }
+   .track-content {
+     flex: 1;
+   }
+   .track-title {
+     font-weight: 500;
+     margin-bottom: 5px;
+   }
+   .track-artist {
+     font-size: 0.9rem;
+     opacity: 0.7;
+   }
+   .controls-container {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     margin: 20px 0;
+   }
+   button {
+     background: rgba(139, 92, 246, 0.8);
+     color: white;
+     border: none;
+     padding: 10px 20px;
+     border-radius: 20px;
+     cursor: pointer;
+     transition: all 0.2s;
+     border: 1px solid rgba(255, 255, 255, 0.2);
+     min-width: 100px;
+   }
+   button:hover {
+     background: rgba(139, 92, 246, 1);
+     transform: translateY(-2px);
+   }
+   button:disabled {
+     opacity: 0.5;
+     cursor: not-allowed;
+   }
+   .progress {
+     width: 100%;
+     height: 6px;
+     background: rgba(255, 255, 255, 0.1);
+     border-radius: 3px;
+     margin: 15px 0;
+     position: relative;
+   }
+   .progress-bar {
+     height: 100%;
+     background: linear-gradient(to right, rgba(139, 92, 246, 0.8), rgba(99, 102, 241, 0.8));
+     border-radius: 3px;
+     width: 0%;
+   }
+   .time {
+     display: flex;
+     justify-content: space-between;
+     font-size: 0.8rem;
+     opacity: 0.8;
+   }
+   .volume-control {
+     display: flex;
+     align-items: center;
+     gap: 10px;
+     margin-top: 15px;
+   }
+   input[type="range"] {
+     -webkit-appearance: none;
+     width: 100%;
+     height: 5px;
+     background: rgba(255, 255, 255, 0.1);
+     border-radius: 5px;
+     outline: none;
+   }
+   input[type="range"]::-webkit-slider-thumb {
+     -webkit-appearance: none;
+     width: 15px;
+     height: 15px;
+     background: rgba(139, 92, 246, 0.8);
+     border-radius: 50%;
+     cursor: pointer;
+   }
+   .now-playing {
+     text-align: center;
+     margin-bottom: 15px;
+   }
+   .now-playing-title {
+     font-size: 1.2rem;
+     font-weight: 300;
+     margin-bottom: 5px;
+   }
+   .now-playing-artist {
+     font-size: 0.9rem;
+     opacity: 0.7;
+   }
+   /* Cacher les playlists de fond mais garder le bouton actif */
+   .playlist.background-playlist {
+     display: none;
+   }
+   /* Styles pour les onglets de playlist */
+   .tabs {
+     display: flex;
+     margin-bottom: 15px;
+     overflow-x: auto;
+     scrollbar-width: thin;
+     padding-bottom: 5px;
+   }
+   .tab {
+     padding: 10px 20px;
+     background: rgba(255, 255, 255, 0.05);
+     border-radius: 20px;
+     margin-right: 10px;
+     cursor: pointer;
+     white-space: nowrap;
+     transition: all 0.2s;
+     border: 1px solid rgba(255, 255, 255, 0.1);
+   }
+   .tab:hover {
+     background: rgba(255, 255, 255, 0.1);
+     transform: translateY(-2px);
+   }
+   .tab.active {
+     background: linear-gradient(to right, rgba(139, 92, 246, 0.4), rgba(99, 102, 241, 0.4));
+     border: 1px solid rgba(255, 255, 255, 0.2);
+   }
+   .playlist-content {
+     display: none;
+     background: rgba(255, 255, 255, 0.1);
+     backdrop-filter: blur(10px);
+     border-radius: 10px;
+     padding: 20px;
+     margin-bottom: 20px;
+     border: 1px solid rgba(255, 255, 255, 0.2);
+   }
+   .playlist-content.active {
+     display: block;
+   }
+   .tabs::-webkit-scrollbar {
+     height: 4px;
+   }
+   .tabs::-webkit-scrollbar-track {
+     background: rgba(255, 255, 255, 0.05);
+     border-radius: 2px;
+   }
+   .tabs::-webkit-scrollbar-thumb {
+     background: rgba(255, 255, 255, 0.2);
+     border-radius: 2px;
+   }
+   .drag-over {
+     border: 2px dashed rgba(139, 92, 246, 0.8);
+     background: rgba(139, 92, 246, 0.1);
+   }
+   .playlist-info {
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     margin-bottom: 15px;
+   }
+   .playlist-help {
+     font-size: 0.8rem;
+     opacity: 0.7;
+     font-style: italic;
+   }
+   .expiration-info {
+     font-size: 0.8rem;
+     opacity: 0.7;
+     text-align: center;
+     margin-top: 20px;
+   }
+   /* Style pour la mention "Déjà joué" */
+   .played-badge {
+     display: inline-block;
+     background: rgba(236, 72, 153, 0.8);
+     color: white;
+     padding: 3px 8px;
+     border-radius: 10px;
+     font-size: 0.8rem;
+     margin-left: 10px;
+     font-weight: bold;
+     border: 1px solid rgba(236, 72, 153, 1);
+     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+     float: right;
+     margin-right: 5px;
+   }
+
+   /* Styles pour l'écran de chargement */
+   .loading-screen {
+     position: fixed;
+     top: 0;
+     left: 0;
+     width: 100%;
+     height: 100%;
+     background: linear-gradient(135deg, #1e1b4b 0%, #2e3494 50%, #4b2a8a 100%);
+     display: flex;
+     flex-direction: column;
+     justify-content: center;
+     align-items: center;
+     z-index: 9999;
+     color: white;
+     text-align: center;
+   }
+   .loading-title {
+     font-size: 2rem;
+     margin-bottom: 2rem;
+     font-weight: 300;
+   }
+   .loading-bar-container {
+     width: 80%;
+     max-width: 400px;
+     height: 10px;
+     background: rgba(255, 255, 255, 0.1);
+     border-radius: 5px;
+     overflow: hidden;
+     margin-bottom: 1rem;
+   }
+   .loading-bar {
+     height: 100%;
+     width: 0%;
+     background: linear-gradient(to right, rgba(139, 92, 246, 0.8), rgba(99, 102, 241, 0.8));
+     border-radius: 5px;
+     transition: width 0.3s ease;
+   }
+   .loading-text {
+     font-size: 1rem;
+     opacity: 0.8;
+   }
+   .player-header {
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     margin-bottom: 15px;
+   }
+   .player-header button {
+     min-width: 120px;
+   }
+   .now-playing {
+     text-align: center;
+     flex: 1;
+     margin: 0 10px;
+   }
+ </style>
+</head>
+<body>
+ <div id="loading-screen" class="loading-screen">
+   <div class="loading-title">
+     <span style="color: rgba(139, 92, 246, 0.9);">Zen</span><span style="color: rgba(236, 72, 153, 0.9);">Hit</span><span style="color: rgba(139, 92, 246, 0.9);">Box</span>
+   </div>
+   <div class="loading-bar-container">
+     <div id="loading-bar" class="loading-bar"></div>
+   </div>
+   <div id="loading-text" class="loading-text">Chargement des fichiers audio...</div>
+ </div>
+ <div class="container">
+   <div class="header">
+     <h1></h1>
+   </div>
+   
+   <div id="playlists-container">
+     <!-- Les playlists seront générées ici par JavaScript -->
+   </div>
+   
+   <div class="player">
+     <div class="player-header">
+       <button id="play-button">Lecture</button>
+       <div class="now-playing">
+         <div class="now-playing-title" id="current-track-title">Aucune piste sélectionnée</div>
+         <div class="now-playing-artist" id="current-track-artist"></div>
+       </div>
+       <button id="background-toggle">Activer la musique de fond</button>
+     </div>
+     
+     <div class="progress">
+       <div class="progress-bar" id="progress-bar"></div>
+     </div>
+     
+     <div class="time">
+       <span id="current-time">0:00</span>
+       <span id="duration">0:00</span>
+     </div>
+     
+     <div class="expiration-info">
+       Valide jusqu'au 2025-03-26
+       <br>
+       <span style="font-size: 0.7rem; opacity: 0.8;">Rafraîchissement de page désactivé pour éviter l'interruption audio</span>
+     </div>
+   </div>
+   
+ </div>
+
+ <script>
+   // Données des playlists (avec chemins relatifs vers les fichiers audio)
+   const playlistsData = [{"id":"background-playlist-default","name":"Musique de fond","tracks":[{"id":"ff83d4d7-20ef-4269-96ab-c9643ce904e3","title":"24K Magic - Bruno Mars - cloclo ","artist":"Funk","url":"audio/background-playlist-default_0_24K_Magic___Bruno_Mars___cloclo_.mp3","coverUrl":""}],"folders":[],"isBackground":true,"coverUrl":"","visibleInLockMode":true},{"id":"edfd916b-7a47-49ca-a376-3fd3334a11e4","name":"Piste de danse","tracks":[{"id":"c8a272c4-7d1a-4ee3-a6cf-c880e495dc5b","title":"0002 - Audio - Assis par terre","artist":"extrait1","url":"audio/edfd916b-7a47-49ca-a376-3fd3334a11e4_0_0002___Audio___Assis_par_terre.mp3","coverUrl":""},{"id":"7532e27f-ec1a-43af-bfd9-7f6a917a798b","title":"0003 - Audio - Crazy","artist":"extrait1","url":"audio/edfd916b-7a47-49ca-a376-3fd3334a11e4_1_0003___Audio___Crazy.mp3","coverUrl":""},{"id":"0ecf707a-b0b1-4770-a594-be7e1e03916c","title":"0004 - Audio - Dieu m'a donné la foi","artist":"extrait1","url":"audio/edfd916b-7a47-49ca-a376-3fd3334a11e4_2_0004___Audio___Dieu_m_a_donn__la_foi.mp3","coverUrl":""},{"id":"852645f6-11e1-4bb9-9327-5c6c722fb661","title":"0005 - Audio - Don't Stop 'Til You Get Enough","artist":"extrait1","url":"audio/edfd916b-7a47-49ca-a376-3fd3334a11e4_3_0005___Audio___Don_t_Stop__Til_You_Get_Enough.mp3","coverUrl":""},{"id":"9e88dee2-b348-4666-b947-89c8d8378bed","title":"0006 - Audio - Ella, elle l'a","artist":"extrait1","url":"audio/edfd916b-7a47-49ca-a376-3fd3334a11e4_4_0006___Audio___Ella__elle_l_a.mp3","coverUrl":""},{"id":"3c524050-8318-4966-88f7-f01c013cb39c","title":"24K Magic - Bruno Mars - cloclo ","artist":"Funk","url":"audio/edfd916b-7a47-49ca-a376-3fd3334a11e4_5_24K_Magic___Bruno_Mars___cloclo_.mp3","coverUrl":""}],"folders":[],"isBackground":false,"coverUrl":"","visibleInLockMode":true}];
+
+   // Fonction pour précharger tous les fichiers audio
+   function preloadAudioFiles() {
+     // Compter le nombre total de fichiers audio
+     let totalFiles = 0;
+     let loadedFiles = 0;
+     
+     // Compter les fichiers dans toutes les playlists
+     playlistsData.forEach(playlist => {
+       totalFiles += playlist.tracks.length;
+     });
+     
+     // Si aucun fichier à charger, masquer l'écran de chargement
+     if (totalFiles === 0) {
+       document.getElementById('loading-screen').style.display = 'none';
+       return;
+     }
+     
+     // Fonction pour mettre à jour la barre de progression
+     function updateProgress() {
+       loadedFiles++;
+       const percent = (loadedFiles / totalFiles) * 100;
+       document.getElementById('loading-bar').style.width = percent + '%';
+       document.getElementById('loading-text').textContent = 
+         `Chargement des fichiers audio (${loadedFiles}/${totalFiles})`;
+       
+       // Si tous les fichiers sont chargés, masquer l'écran de chargement
+       if (loadedFiles >= totalFiles) {
+         setTimeout(() => {
+           document.getElementById('loading-screen').style.display = 'none';
+         }, 500); // Petit délai pour voir la barre complète
+       }
+     }
+     
+     // Précharger chaque fichier audio
+     playlistsData.forEach(playlist => {
+       playlist.tracks.forEach(track => {
+         const audio = new Audio();
+         audio.addEventListener('canplaythrough', updateProgress, { once: true });
+         audio.addEventListener('error', updateProgress, { once: true }); // Compter même en cas d'erreur
+         audio.src = track.url;
+       });
+     });
+   }
+   
+   // Éléments DOM
+   const playButton = document.getElementById('play-button');
+   const progressBar = document.getElementById('progress-bar');
+   const currentTimeEl = document.getElementById('current-time');
+   const durationEl = document.getElementById('duration');
+   const currentTrackTitleEl = document.getElementById('current-track-title');
+   const currentTrackArtistEl = document.getElementById('current-track-artist');
+   const playlistsContainer = document.getElementById('playlists-container');
+   const backgroundToggle = document.getElementById('background-toggle');
+   
+   // Variables audio
+   const audioPlayer = new Audio();
+   const backgroundPlayer = new Audio();
+   let currentPlaylist = null;
+   let currentTrackIndex = null;
+   let isPlaying = false;
+   let isBackgroundPlaying = false;
+   let backgroundPlaylist = playlistsData.find(p => p.isBackground);
+   let backgroundTrackIndex = 0;
+   let draggedTrack = null;
+   // Suivi des pistes déjà jouées
+   let playedTracksInSession = {};
+   
+   
+    // Vérification de la date d'expiration
+    function checkExpiration() {
+      const expirationDate = new Date("2025-03-26T23:59:59");
+      const currentDate = new Date();
+      
+      if (currentDate > expirationDate) {
+        // Créer un overlay d'expiration
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        overlay.style.zIndex = '9999';
+        overlay.style.display = 'flex';
+        overlay.style.flexDirection = 'column';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.color = 'white';
+        overlay.style.textAlign = 'center';
+        overlay.style.padding = '20px';
+        
+        const message = document.createElement('h1');
+        message.textContent = 'Ce fichier a expiré';
+        message.style.fontSize = '2rem';
+        message.style.marginBottom = '20px';
+        
+        const subMessage = document.createElement('p');
+        subMessage.textContent = 'La période d\'utilisation de ce fichier est terminée (2025-03-26).';
+        subMessage.style.fontSize = '1.2rem';
+        
+        overlay.appendChild(message);
+        overlay.appendChild(subMessage);
+        document.body.appendChild(overlay);
+        
+        // Arrêter toute lecture audio
+        if (audioPlayer) audioPlayer.pause();
+        if (backgroundPlayer) backgroundPlayer.pause();
+        
+        // Désactiver les fonctionnalités
+        document.querySelectorAll('button').forEach(btn => {
+          btn.disabled = true;
+        });
+        
+        document.querySelectorAll('.track').forEach(track => {
+          track.style.pointerEvents = 'none';
+          track.style.opacity = '0.5';
+        });
+        
+        return false;
+      }
+      return true;
+    }
+    
+    // Vérifier l'expiration au chargement
+    if (!checkExpiration()) {
+      console.log("Fichier expiré");
+    }
+    
+   
+   // Initialisation
+   function init() {
+     // Configurer le volume initial
+     audioPlayer.volume = 0.7; // Volume fixe
+     backgroundPlayer.volume = 0.3;
+     
+     // Générer les playlists
+     renderPlaylists();
+     
+     // Configurer les événements
+     setupEventListeners();
+     
+     // Précharger les fichiers audio
+     preloadAudioFiles();
+     
+     // Empêcher le rafraîchissement par F5
+     window.addEventListener('keydown', function(e) {
+       // Touche F5 (code 116)
+       if (e.keyCode === 116 || e.key === 'F5') {
+         e.preventDefault();
+         console.log('Rafraîchissement par F5 bloqué');
+         return false;
+       }
+     });
+     
+     // Avertissement avant de quitter/rafraîchir la page
+     window.addEventListener('beforeunload', function(e) {
+       // Annuler l'événement
+       e.preventDefault();
+       // Message d'avertissement (peut ne pas s'afficher dans certains navigateurs modernes)
+       e.returnValue = 'La lecture audio sera interrompue si vous quittez cette page. Êtes-vous sûr de vouloir continuer?';
+       return e.returnValue;
+     });
+     
+     console.log("Initialisation terminée avec protection contre le rafraîchissement");
+   }
+   
+   // Rendu des playlists
+   function renderPlaylists() {
+     // Créer les onglets
+     const tabsContainer = document.createElement('div');
+     tabsContainer.className = 'tabs';
+     
+     // Créer le conteneur pour le contenu des playlists
+     const playlistsContent = document.createElement('div');
+     playlistsContent.className = 'playlists-content';
+     
+     // Variable pour suivre le premier onglet non-background
+     let firstNonBackgroundTab = null;
+     
+     // Filtrer les playlists pour exclure les playlists de fond des onglets
+     const regularPlaylists = playlistsData.filter(p => !p.isBackground);
+     
+     // Créer un onglet et un contenu pour chaque playlist régulière
+     regularPlaylists.forEach((playlist, index) => {
+       // Créer l'onglet
+       const tab = document.createElement('div');
+       tab.className = 'tab';
+       tab.dataset.playlistId = playlist.id;
+       tab.textContent = playlist.name;
+       tabsContainer.appendChild(tab);
+       
+       // Créer le contenu de la playlist
+       const playlistEl = document.createElement('div');
+       playlistEl.className = 'playlist-content';
+       playlistEl.dataset.playlistId = playlist.id;
+       
+       // Ajouter le titre et l'aide pour le glisser-déposer
+       const playlistInfoEl = document.createElement('div');
+       playlistInfoEl.className = 'playlist-info';
+       playlistInfoEl.style.justifyContent = 'center'; // Centrer le contenu
+       playlistInfoEl.style.marginBottom = '20px';
+
+       // Créer le titre stylisé ZenHitBox
+       const titleEl = document.createElement('div');
+       titleEl.className = 'app-title';
+       titleEl.style.fontSize = '2rem';
+       titleEl.style.fontWeight = '300';
+       titleEl.style.textAlign = 'center';
+       titleEl.style.width = '100%';
+
+       // Créer les spans colorés pour chaque partie du titre
+       const zenSpan = document.createElement('span');
+       zenSpan.textContent = 'Zen';
+       zenSpan.style.color = 'rgba(139, 92, 246, 0.9)'; // Couleur violette
+
+       const hitSpan = document.createElement('span');
+       hitSpan.textContent = 'Hit';
+       hitSpan.style.color = 'rgba(236, 72, 153, 0.9)'; // Couleur rose/rouge dynamique
+
+       const boxSpan = document.createElement('span');
+       boxSpan.textContent = 'Box';
+       boxSpan.style.color = 'rgba(139, 92, 246, 0.9)'; // Même couleur que Zen
+
+       // Ajouter les spans au titre
+       titleEl.appendChild(zenSpan);
+       titleEl.appendChild(hitSpan);
+       titleEl.appendChild(boxSpan);
+
+       // Ajouter le titre à l'élément d'info de playlist
+       playlistInfoEl.appendChild(titleEl);
+       
+       playlistEl.appendChild(playlistInfoEl);
+       
+       // Ajouter les pistes ou un message si la playlist est vide
+       if (playlist.tracks.length === 0) {
+         const emptyEl = document.createElement('p');
+         emptyEl.textContent = 'Aucune piste dans cette playlist';
+         emptyEl.style.opacity = '0.7';
+         emptyEl.style.textAlign = 'center';
+         playlistEl.appendChild(emptyEl);
+       } else {
+         playlist.tracks.forEach((track, trackIndex) => {
+           // Vérifier si cette piste a déjà été jouée
+           const trackKey = playlist.id + '-' + trackIndex;
+           const isPlayed = playedTracksInSession[trackKey] === true;
+           
+           const trackEl = document.createElement('div');
+           trackEl.className = 'track';
+           if (isPlayed) {
+             trackEl.classList.add('played');
+           }
+           trackEl.dataset.playlistId = playlist.id;
+           trackEl.dataset.trackIndex = String(trackIndex);
+           // Désactiver le glisser-déposer pour les pistes déjà jouées
+           trackEl.draggable = !isPlayed;
+
+           // Ajouter un indicateur visuel que la piste ne peut pas être déplacée
+           if (isPlayed) {
+             trackEl.style.cursor = 'not-allowed';
+             
+           }
+           
+           // Ajouter une poignée de glisser-déposer
+           const handleEl = document.createElement('div');
+           handleEl.className = 'track-drag-handle';
+           handleEl.innerHTML = '&#8942;&#8942;'; // Icône de poignée (deux lignes verticales de points)
+           trackEl.appendChild(handleEl);
+           if (isPlayed) {
+            handleEl.style.cursor = 'not-allowed';
+            handleEl.style.opacity = '0.3'; // Réduire l'opacité de la poignée pour les pistes jouées
+          }
+           
+           // Contenu de la piste
+           const contentEl = document.createElement('div');
+           contentEl.className = 'track-content';
+           
+           // Titre et artiste
+           const titleEl = document.createElement('div');
+           titleEl.className = 'track-title';
+           titleEl.textContent = track.title;
+           
+           // Si la piste a déjà été jouée, ajouter le badge
+           if (isPlayed) {
+             const badge = document.createElement('span');
+             badge.className = 'played-badge';
+             badge.textContent = 'Déjà joué';
+             titleEl.appendChild(badge);
+           }
+           
+           contentEl.appendChild(titleEl);
+           
+           if (track.artist) {
+             const artistEl = document.createElement('div');
+             artistEl.className = 'track-artist';
+             artistEl.textContent = track.artist;
+             contentEl.appendChild(artistEl);
+           }
+           
+           trackEl.appendChild(contentEl);
+           
+           // Événements de glisser-déposer
+           trackEl.addEventListener('dragstart', (e) => {
+             draggedTrack = {
+               playlistId: playlist.id,
+               trackIndex: trackIndex
+             };
+             trackEl.classList.add('dragging');
+             // Stocker les données pour le transfert
+             e.dataTransfer.setData('text/plain', JSON.stringify(draggedTrack));
+             e.dataTransfer.effectAllowed = 'move';
+           });
+           
+           trackEl.addEventListener('dragend', () => {
+             trackEl.classList.remove('dragging');
+             draggedTrack = null;
+             // Supprimer la classe drag-over de tous les éléments
+             document.querySelectorAll('.track').forEach(el => {
+               el.classList.remove('drag-over');
+             });
+           });
+           
+           trackEl.addEventListener('dragover', (e) => {
+             e.preventDefault();
+             e.dataTransfer.dropEffect = 'move';
+           });
+           
+           trackEl.addEventListener('dragenter', (e) => {
+             e.preventDefault();
+             if (draggedTrack && draggedTrack.playlistId === playlist.id) {
+               trackEl.classList.add('drag-over');
+             }
+           });
+           
+           trackEl.addEventListener('dragleave', () => {
+             trackEl.classList.remove('drag-over');
+           });
+           
+           trackEl.addEventListener('drop', (e) => {
+             e.preventDefault();
+             trackEl.classList.remove('drag-over');
+             
+             if (!draggedTrack) return;
+             
+             // Vérifier que le drop est dans la même playlist
+             if (draggedTrack.playlistId === playlist.id) {
+               const fromIndex = draggedTrack.trackIndex;
+               const toIndex = trackIndex;
+               
+               if (fromIndex !== toIndex) {
+                 // Réorganiser les pistes dans le tableau de données
+                 const playlistIndex = playlistsData.findIndex(p => p.id === playlist.id);
+                 if (playlistIndex !== -1) {
+                   const tracks = [...playlistsData[playlistIndex].tracks];
+                   const [movedTrack] = tracks.splice(fromIndex, 1);
+                   tracks.splice(toIndex, 0, movedTrack);
+                   playlistsData[playlistIndex].tracks = tracks;
+                   
+                   // Mettre à jour l'index de la piste actuelle si nécessaire
+                   if (currentPlaylist === playlist.id) {
+                     if (currentTrackIndex === fromIndex) {
+                       currentTrackIndex = toIndex;
+                     } else if (currentTrackIndex > fromIndex && currentTrackIndex <= toIndex) {
+                       currentTrackIndex--;
+                     } else if (currentTrackIndex < fromIndex && currentTrackIndex >= toIndex) {
+                       currentTrackIndex++;
+                     }
+                   }
+                   
+                   // Rafraîchir l'affichage de la playlist
+                   refreshPlaylistContent(playlist.id);
+                 }
+               }
+             }
+           });
+           
+           // Événement de clic pour lire la piste
+           trackEl.addEventListener('click', (e) => {
+             if (e.target === handleEl || handleEl.contains(e.target)) {
+               return;
+             }
+             
+             // Vérifier si un titre est déjà en cours de lecture
+             if (isPlaying) {
+               // Ignorer le clic si un titre est déjà en cours de lecture
+               return;
+             }
+             
+             playTrack(playlist.id, trackIndex);
+           });
+           
+           playlistEl.appendChild(trackEl);
+         });
+       }
+       
+       // Ajouter le contenu de la playlist au conteneur
+       playlistsContent.appendChild(playlistEl);
+       
+       // Enregistrer le premier onglet
+       if (firstNonBackgroundTab === null) {
+         firstNonBackgroundTab = tab;
+       }
+       
+       // Ajouter l'événement de clic sur l'onglet
+       tab.addEventListener('click', () => {
+         // Désactiver tous les onglets et contenus
+         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+         document.querySelectorAll('.playlist-content').forEach(c => c.classList.remove('active'));
+         
+         // Activer l'onglet et le contenu correspondant
+         tab.classList.add('active');
+         const contentToActivate = document.querySelector('.playlist-content[data-playlist-id="' + playlist.id + '"]');
+         if (contentToActivate) {
+           contentToActivate.classList.add('active');
+         }
+       });
+     });
+     
+     // Ajouter les onglets et le contenu au conteneur principal seulement s'il y a des playlists régulières
+     if (regularPlaylists.length > 0) {
+       playlistsContainer.appendChild(tabsContainer);
+       playlistsContainer.appendChild(playlistsContent);
+       
+       // Activer le premier onglet par défaut
+       if (firstNonBackgroundTab) {
+         firstNonBackgroundTab.click();
+       }
+     } else {
+       // S'il n'y a pas de playlists régulières, afficher un message
+       const noPlaylistsMessage = document.createElement('div');
+       noPlaylistsMessage.className = 'playlist';
+       noPlaylistsMessage.innerHTML = '<p style="text-align: center; opacity: 0.7;">Aucune playlist disponible</p>';
+       playlistsContainer.appendChild(noPlaylistsMessage);
+     }
+   }
+   
+   // Rafraîchir le contenu d'une playlist après réorganisation
+   function refreshPlaylistContent(playlistId) {
+     const playlistEl = document.querySelector('.playlist-content[data-playlist-id="' + playlistId + '"]');
+     if (!playlistEl) return;
+     
+     const playlist = playlistsData.find(p => p.id === playlistId);
+     if (!playlist) return;
+     
+     // Supprimer toutes les pistes existantes
+     const tracks = playlistEl.querySelectorAll('.track');
+     tracks.forEach(track => track.remove());
+     
+     // Conserver le titre ZenHitBox
+     const playlistInfoEl = playlistEl.querySelector('.playlist-info');
+     
+     // Vider le contenu de la playlist sauf le titre
+     while (playlistEl.childNodes.length > 1) {
+       if (playlistEl.lastChild !== playlistInfoEl) {
+         playlistEl.removeChild(playlistEl.lastChild);
+       }
+     }
+     
+     // Recréer les pistes avec les nouvelles positions
+     playlist.tracks.forEach((track, trackIndex) => {
+       // Vérifier si cette piste a déjà été jouée
+       const trackKey = playlistId + '-' + trackIndex;
+       const isPlayed = playedTracksInSession[trackKey] === true;
+       
+       const trackEl = document.createElement('div');
+       trackEl.className = 'track';
+       if (isPlayed) {
+         trackEl.classList.add('played');
+       }
+       trackEl.dataset.playlistId = playlistId;
+       trackEl.dataset.trackIndex = String(trackIndex);
+       // Désactiver le glisser-déposer pour les pistes déjà jouées
+       trackEl.draggable = !isPlayed;
+
+       // Ajouter un indicateur visuel que la piste ne peut pas être déplacée
+       if (isPlayed) {
+         trackEl.style.cursor = 'not-allowed';
+         
+       }
+       
+       // Ajouter une poignée de glisser-déposer
+       const handleEl = document.createElement('div');
+       handleEl.className = 'track-drag-handle';
+       handleEl.innerHTML = '&#8942;&#8942;'; // Icône de poignée
+       trackEl.appendChild(handleEl);
+       if (isPlayed) {
+        handleEl.style.cursor = 'not-allowed';
+        handleEl.style.opacity = '0.3'; // Réduire l'opacité de la poignée pour les pistes jouées
+      }
+       
+       // Contenu de la piste
+       const contentEl = document.createElement('div');
+       contentEl.className = 'track-content';
+       
+       // Titre et artiste
+       const titleEl = document.createElement('div');
+       titleEl.className = 'track-title';
+       titleEl.textContent = track.title;
+       
+       // Si la piste a déjà été jouée, ajouter le badge
+       if (isPlayed) {
+         const badge = document.createElement('span');
+         badge.className = 'played-badge';
+         badge.textContent = 'Déjà joué';
+         titleEl.appendChild(badge);
+       }
+       
+       contentEl.appendChild(titleEl);
+       
+       if (track.artist) {
+         const artistEl = document.createElement('div');
+         artistEl.className = 'track-artist';
+         artistEl.textContent = track.artist;
+         contentEl.appendChild(artistEl);
+       }
+       
+       trackEl.appendChild(contentEl);
+       
+       // Marquer la piste active
+       if (currentPlaylist === playlistId && currentTrackIndex === trackIndex) {
+         trackEl.classList.add('active');
+       }
+       
+       // Événements de glisser-déposer
+       trackEl.addEventListener('dragstart', (e) => {
+         draggedTrack = {
+           playlistId: playlistId,
+           trackIndex: trackIndex
+         };
+         trackEl.classList.add('dragging');
+         e.dataTransfer.setData('text/plain', JSON.stringify(draggedTrack));
+         e.dataTransfer.effectAllowed = 'move';
+       });
+       
+       trackEl.addEventListener('dragend', () => {
+         trackEl.classList.remove('dragging');
+         draggedTrack = null;
+         document.querySelectorAll('.track').forEach(el => {
+           el.classList.remove('drag-over');
+         });
+       });
+       
+       trackEl.addEventListener('dragover', (e) => {
+         e.preventDefault();
+         e.dataTransfer.dropEffect = 'move';
+       });
+       
+       trackEl.addEventListener('dragenter', (e) => {
+         e.preventDefault();
+         if (draggedTrack && draggedTrack.playlistId === playlistId) {
+           trackEl.classList.add('drag-over');
+         }
+       });
+       
+       trackEl.addEventListener('dragleave', () => {
+         trackEl.classList.remove('drag-over');
+       });
+       
+       trackEl.addEventListener('drop', (e) => {
+         e.preventDefault();
+         trackEl.classList.remove('drag-over');
+         
+         if (!draggedTrack) return;
+         
+         if (draggedTrack.playlistId === playlistId) {
+           const fromIndex = draggedTrack.trackIndex;
+           const toIndex = trackIndex;
+           
+           if (fromIndex !== toIndex) {
+             const playlistIndex = playlistsData.findIndex(p => p.id === playlistId);
+             if (playlistIndex !== -1) {
+               const tracks = [...playlistsData[playlistIndex].tracks];
+               const [movedTrack] = tracks.splice(fromIndex, 1);
+               tracks.splice(toIndex, 0, movedTrack);
+               playlistsData[playlistIndex].tracks = tracks;
+               
+               if (currentPlaylist === playlistId) {
+                 if (currentTrackIndex === fromIndex) {
+                   currentTrackIndex = toIndex;
+                 } else if (currentTrackIndex > fromIndex && currentTrackIndex <= toIndex) {
+                   currentTrackIndex--;
+                 } else if (currentTrackIndex < fromIndex && currentTrackIndex >= toIndex) {
+                   currentTrackIndex++;
+                 }
+               }
+               
+               refreshPlaylistContent(playlistId);
+             }
+           }
+         }
+       });
+       
+       // Événement de clic pour lire la piste
+       trackEl.addEventListener('click', (e) => {
+         if (e.target === handleEl || handleEl.contains(e.target)) {
+           return;
+         }
+         
+         // Vérifier si un titre est déjà en cours de lecture
+         if (isPlaying) {
+           // Ignorer le clic si un titre est déjà en cours de lecture
+           return;
+         }
+         
+         playTrack(playlistId, trackIndex);
+       });
+       
+       // Ajouter la piste à la playlist
+       playlistEl.appendChild(trackEl);
+     });
+   }
+   
+   // Lecture d'une piste avec réorganisation des pistes jouées
+function playTrack(playlistId, trackIndex) {
+  const playlist = playlistsData.find(p => p.id === playlistId);
+  if (!playlist || !playlist.tracks[trackIndex]) return;
+  
+  // Vérifier si la piste a déjà été jouée
+  const trackKey = playlistId + '-' + trackIndex;
+  if (playedTracksInSession[trackKey]) {
+    // Demander confirmation avant de rejouer
+    if (!confirm('Cette piste a déjà été jouée. Voulez-vous la rejouer ?')) {
+      return; // Annuler la lecture si l'utilisateur refuse
+    }
+  }
+  
+  // Sauvegarder la référence à la piste actuelle avant réorganisation
+  const currentTrack = playlist.tracks[trackIndex];
+  
+  // Marquer la piste comme jouée
+  playedTracksInSession[trackKey] = true;
+  
+  // Mettre à jour l'état actuel
+  currentPlaylist = playlistId;
+  currentTrackIndex = trackIndex;
+  
+  // Mettre à jour l'interface avant réorganisation
+  updateActiveTrack();
+  
+  // Charger et lire la piste
+  audioPlayer.src = currentTrack.url;
+  audioPlayer.load();
+  
+  // Mettre à jour les informations de la piste
+  currentTrackTitleEl.textContent = currentTrack.title;
+  currentTrackArtistEl.textContent = currentTrack.artist || '';
+  
+  // Démarrer la lecture
+  audioPlayer.play()
+    .then(() => {
+      isPlaying = true;
+      playButton.textContent = 'Pause';
+      
+      // Réduire le volume de la musique de fond
+      if (isBackgroundPlaying) {
+        backgroundPlayer.volume = 0;
+      }
+      
+      // Réorganiser la playlist APRÈS avoir commencé la lecture
+      // pour éviter les problèmes d'interface
+      reorganizePlaylist(playlistId, trackIndex);
+    })
+    .catch(error => {
+      console.error('Erreur de lecture:', error);
+    });
+}
+
+// Fonction pour réorganiser la playlist (piste actuelle en haut, pistes jouées à la fin)
+function reorganizePlaylist(playlistId, originalTrackIndex) {
+ const playlistIndex = playlistsData.findIndex(p => p.id === playlistId);
+ if (playlistIndex === -1) return;
+ 
+ const playlist = playlistsData[playlistIndex];
+ const tracks = [...playlist.tracks];
+ 
+ // Trouver la piste actuelle
+ const currentTrack = tracks[originalTrackIndex];
+ 
+ // Séparer les pistes en trois groupes : piste actuelle, pistes non jouées, pistes déjà jouées
+ const currentTracks = currentTrack ? [currentTrack] : [];
+ const unplayedTracks = [];
+ const playedTracks = [];
+ 
+ // Parcourir toutes les pistes pour les classer
+ tracks.forEach((track, index) => {
+   // Ignorer la piste actuelle car elle est déjà dans currentTracks
+   if (index === originalTrackIndex) return;
+   
+   const trackKey = playlistId + '-' + index;
+   if (playedTracksInSession[trackKey]) {
+     playedTracks.push(track);
+   } else {
+     unplayedTracks.push(track);
+   }
+ });
+ 
+ // Réorganiser la playlist : piste actuelle, puis pistes non jouées, puis pistes jouées
+ const newTracks = [...currentTracks, ...unplayedTracks, ...playedTracks];
+ playlistsData[playlistIndex].tracks = newTracks;
+ 
+ // Mettre à jour l'index de la piste actuelle après réorganisation
+ currentTrackIndex = 0; // La piste actuelle est maintenant en première position
+ 
+ // Mettre à jour les clés dans playedTracksInSession pour refléter les nouveaux indices
+ const newPlayedTracksInSession = {};
+ 
+ // La piste actuelle est toujours jouée et est maintenant à l'index 0
+ newPlayedTracksInSession[playlistId + '-0'] = true;
+ 
+ // Les pistes déjà jouées sont maintenant à la fin
+ for (let i = 0; i < playedTracks.length; i++) {
+   const newIndex = currentTracks.length + unplayedTracks.length + i;
+   newPlayedTracksInSession[playlistId + '-' + newIndex] = true;
+ }
+ 
+ // Remplacer l'ancien objet par le nouveau
+ playedTracksInSession = newPlayedTracksInSession;
+ 
+ // Rafraîchir l'affichage de la playlist
+ refreshPlaylistContent(playlistId);
+}
+
+// Fonction pour vérifier si toutes les pistes d'une playlist ont été jouées
+function areAllTracksPlayed(playlistId) {
+  const playlist = playlistsData.find(p => p.id === playlistId);
+  if (!playlist) return false;
+  
+  // Vérifier chaque piste
+  for (let i = 0; i < playlist.tracks.length; i++) {
+    const trackKey = playlistId + '-' + i;
+    if (!playedTracksInSession[trackKey]) {
+      return false; // Au moins une piste n'a pas encore été jouée
+    }
+  }
+  
+  return true; // Toutes les pistes ont été jouées
+}
+   
+   // Basculer lecture/pause
+   function togglePlay() {
+     if (!currentPlaylist || currentTrackIndex === null) {
+       // Si aucune piste n'est sélectionnée, jouer la première piste de la première playlist
+       const firstPlaylist = playlistsData.find(p => !p.isBackground && p.tracks.length > 0);
+       if (firstPlaylist) {
+         playTrack(firstPlaylist.id, 0);
+       }
+       return;
+     }
+     
+     if (isPlaying) {
+       audioPlayer.pause();
+       isPlaying = false;
+       playButton.textContent = 'Lecture';
+       
+       // Restaurer le volume de la musique de fond
+       if (isBackgroundPlaying) {
+         backgroundPlayer.volume = 0.3;
+       }
+     } else {
+       audioPlayer.play()
+         .then(() => {
+           isPlaying = true;
+           playButton.textContent = 'Pause';
+           
+           // Réduire le volume de la musique de fond
+           if (isBackgroundPlaying) {
+             backgroundPlayer.volume = 0;
+           }
+         })
+         .catch(error => {
+           console.error('Erreur de lecture:', error);
+         });
+     }
+   }
+   
+   // Piste suivante
+   function playNext() {
+     if (!currentPlaylist || currentTrackIndex === null) return;
+     
+     const playlist = playlistsData.find(p => p.id === currentPlaylist);
+     if (!playlist) return;
+     
+     // Si c'est la dernière piste, arrêter la lecture au lieu de revenir au début
+     if (currentTrackIndex >= playlist.tracks.length - 1) {
+       audioPlayer.pause();
+       isPlaying = false;
+       playButton.textContent = 'Lecture';
+       
+       // Restaurer le volume de la musique de fond
+       if (isBackgroundPlaying) {
+         backgroundPlayer.volume = 0.3;
+       }
+     } else {
+       // Sinon, passer à la piste suivante
+       const nextIndex = currentTrackIndex + 1;
+       playTrack(currentPlaylist, nextIndex);
+     }
+   }
+   
+   // Piste précédente
+   function playPrevious() {
+     if (!currentPlaylist || currentTrackIndex === null) return;
+     
+     const playlist = playlistsData.find(p => p.id === currentPlaylist);
+     if (!playlist) return;
+     
+     const prevIndex = currentTrackIndex <= 0 ? playlist.tracks.length - 1 : currentTrackIndex - 1;
+     playTrack(currentPlaylist, prevIndex);
+   }
+   
+   // Passer à la piste suivante dans la playlist de fond
+   function playNextBackgroundTrack() {
+     if (!backgroundPlaylist || !isBackgroundPlaying) return;
+     
+     // Passer à la piste suivante dans la playlist de fond
+     backgroundTrackIndex = (backgroundTrackIndex + 1) % backgroundPlaylist.tracks.length;
+     
+     // Charger et lire la nouvelle piste de fond
+     const track = backgroundPlaylist.tracks[backgroundTrackIndex];
+     if (track) {
+       backgroundPlayer.src = track.url;
+       backgroundPlayer.load();
+       backgroundPlayer.volume = isPlaying ? 0 : 0.3;
+       
+       backgroundPlayer.play()
+         .catch(error => {
+           console.error('Erreur de lecture de la musique de fond:', error);
+         });
+     }
+   }
+   
+   // Mise à jour de la barre de progression
+   function updateProgress() {
+     const percent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+     progressBar.style.width = percent + '%';
+     currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
+   }
+   
+   // Mise à jour de la piste active dans l'interface
+   function updateActiveTrack() {
+     // Supprimer la classe active de toutes les pistes
+     document.querySelectorAll('.track').forEach(el => {
+       el.classList.remove('active');
+     });
+     
+     // Ajouter la classe active à la piste en cours
+     if (currentPlaylist && currentTrackIndex !== null) {
+       const selector = '.track[data-playlist-id="' + currentPlaylist + '"][data-track-index="' + currentTrackIndex + '"]';
+       const trackEl = document.querySelector(selector);
+       if (trackEl) {
+         trackEl.classList.add('active');
+         
+         // Activer l'onglet correspondant à la playlist en cours
+         const tabSelector = '.tab[data-playlist-id="' + currentPlaylist + '"]';
+         const tabEl = document.querySelector(tabSelector);
+         if (tabEl) {
+           tabEl.click();
+         }
+         
+         // Faire défiler jusqu'à la piste active
+         trackEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+       }
+     }
+   }
+   
+   // Activer/désactiver la musique de fond
+   function toggleBackgroundMusic() {
+     if (isBackgroundPlaying) {
+       // Arrêter la musique de fond
+       backgroundPlayer.pause();
+       backgroundPlayer.src = '';
+       isBackgroundPlaying = false;
+       backgroundToggle.textContent = 'Activer la musique de fond';
+     } else {
+       // Démarrer la musique de fond
+       if (backgroundPlaylist && backgroundPlaylist.tracks.length > 0) {
+         // Utiliser l'index actuel de la piste de fond
+         backgroundTrackIndex = 0; // Commencer par la première piste
+         const track = backgroundPlaylist.tracks[backgroundTrackIndex];
+         
+         backgroundPlayer.src = track.url;
+         backgroundPlayer.volume = isPlaying ? 0 : 0.3;
+         
+         backgroundPlayer.play()
+           .then(() => {
+             isBackgroundPlaying = true;
+             backgroundToggle.textContent = 'Arrêter la musique de fond';
+           })
+           .catch(error => {
+             console.error('Erreur de lecture de la musique de fond:', error);
+           });
+       } else {
+         alert('Aucune playlist de fond disponible ou playlist vide');
+       }
+     }
+   }
+   
+   // Formater le temps en minutes:secondes
+   function formatTime(time) {
+     if (isNaN(time)) return '0:00';
+     const minutes = Math.floor(time / 60);
+     const seconds = Math.floor(time % 60);
+     return minutes + ':' + seconds.toString().padStart(2, '0');
+   }
+   
+   // Initialiser l'application
+   init();
+   
+   // Configuration des écouteurs d'événements
+   function setupEventListeners() {
+     // Bouton lecture/pause
+     playButton.addEventListener('click', togglePlay);
+     
+     // Mise à jour de la barre de progression
+     audioPlayer.addEventListener('timeupdate', updateProgress);
+     
+     // Mise à jour de la durée
+     audioPlayer.addEventListener('loadedmetadata', () => {
+       durationEl.textContent = formatTime(audioPlayer.duration);
+     });
+     
+     // Fin de la piste
+     audioPlayer.addEventListener('ended', () => {
+ // Marquer la piste comme jouée lorsqu'elle est terminée
+ if (currentPlaylist && currentTrackIndex !== null) {
+   const trackKey = currentPlaylist + '-' + currentTrackIndex;
+   playedTracksInSession[trackKey] = true;
+   console.log("Piste marquée comme jouée:", trackKey);
+   
+   // Vérifier si toutes les pistes de la playlist ont été jouées
+   if (areAllTracksPlayed(currentPlaylist)) {
+     // Si toutes les pistes ont été jouées, arrêter la lecture
+     audioPlayer.pause();
+     isPlaying = false;
+     playButton.textContent = 'Lecture';
+     
+     // Restaurer le volume de la musique de fond
+     if (isBackgroundPlaying) {
+       backgroundPlayer.volume = 0.3;
+     }
+     
+     // Afficher une notification que la playlist est terminée
+     const notification = document.createElement('div');
+     notification.textContent = 'Playlist terminée ! Toutes les pistes ont été jouées.';
+     notification.style.position = 'fixed';
+     notification.style.top = '20px';
+     notification.style.left = '50%';
+     notification.style.transform = 'translateX(-50%)';
+     notification.style.padding = '10px 20px';
+     notification.style.backgroundColor = 'rgba(139, 92, 246, 0.9)';
+     notification.style.color = 'white';
+     notification.style.borderRadius = '20px';
+     notification.style.zIndex = '9999';
+     notification.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
+     document.body.appendChild(notification);
+     
+     // Supprimer la notification après 5 secondes
+     setTimeout(() => {
+       document.body.removeChild(notification);
+     }, 5000);
+     
+     return;
+   }
+   
+   // Réorganiser la playlist après avoir marqué la piste comme jouée
+   reorganizePlaylist(currentPlaylist, currentTrackIndex);
+ }
+ 
+ playNext();
+});
+     
+     // Bouton musique de fond
+     backgroundToggle.addEventListener('click', toggleBackgroundMusic);
+     
+     // Fin de la piste de fond - passer à la piste suivante
+     backgroundPlayer.addEventListener('ended', playNextBackgroundTrack);
+   }
+ </script>
+</body>
+</html>
+    
